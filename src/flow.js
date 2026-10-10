@@ -2,7 +2,7 @@
 import { CFG } from "./config.js";
 import { api } from "./ai/client.js";
 import { slug } from "./util.js";
-import { testGame } from "./game/host.js";
+import { testGame, probeKeys } from "./game/host.js";
 
 /* ---------- asset snapshot for the AI and the game package ---------- */
 
@@ -172,11 +172,15 @@ function makePkg(code, man, list, title, prompt) {
   return { v: 1, title: man.title || title, prompt: String(prompt || "").slice(0, 1200), code, manifest: man, assets: pkgAssets(list) };
 }
 
-async function playtest(room, report, list, base) {
+async function playtest(room, report, list, base, testPlayers) {
   const issues = [];
   const st = (report.stats && report.stats.draws) || {};
   const fv = (report.stats && report.stats.firstVisible) || {};
-  const avatars = list.filter((a) => a.label === "avatar" && a.content);
+  /* Only the first player is simulated, so only THEIR avatar can be measured. Other players publish no state in the test. */
+  const meId = testPlayers && testPlayers[0] ? testPlayers[0].id : null;
+  const allAv = list.filter((a) => a.label === "avatar" && a.content);
+  const ownAv = allAv.filter((a) => a.owner === meId);
+  const avatars = ownAv.length ? ownAv : allAv.slice(0, 1);
   const measure = [];
   for (const a of avatars) {
     const s = st[a.slug];
@@ -185,10 +189,18 @@ async function playtest(room, report, list, base) {
   const players = room.playerList().length || 1;
   if (avatars.length && !avatars.some((a) => st[a.slug] && st[a.slug].vis > 0)) issues.push("No avatar drawing is ever drawn visibly on screen. Draw every player with G.drawPlayer(player, x, y, {h: ~100}) at an on-screen position every frame.");
   else if (avatars.length && avatars.every((a) => fv[a.slug] == null || fv[a.slug] > 90)) issues.push("The avatar is not visible during the first 1.5 seconds. Players must be visible from the first frame.");
+  const jumpKeys = (report.keys || []).filter((k) => ["space", "up", "w"].includes(k)).slice(0, 3);
+  let probes = {};
+  if (jumpKeys.length && avatars.length) { try { probes = await probeKeys(report.pkg, testPlayers, jumpKeys); } catch (e) { probes = {}; } }
+  const avDrawn = avatars.some((a) => st[a.slug] && st[a.slug].vis > 0);
+  const dead = Object.keys(probes).filter((k) => !probes[k]);
+  if (avDrawn && dead.length && dead.length === Object.keys(probes).length) {
+    issues.push(`Holding ${dead.map((k) => `"${k}"`).join(", ")} does not make the avatar move at all (no jump, flight or reaction on screen). The player must jump or react immediately when the key is pressed: check the on-ground condition (it must be able to become true at the start), that input is read every frame, and that nothing blocks it (cooldowns, stuck state, game-over flag).`);
+  }
   if (report.calm && report.calm.length === 2) {
     try {
       await log(room, "A playtester is checking the first seconds...");
-      const res = await api("qa", { prompt: base.prompt, assets: forAI(list).map((a) => Object.assign({}, a, { img: undefined })), players: base.players, calm: report.calm, measure: measure.join("; ") });
+      const res = await api("qa", { prompt: base.prompt, assets: forAI(list).map((a) => Object.assign({}, a, { img: undefined })), players: base.players, calm: report.calm, measure: measure.join("; ") + (measure.length ? ". " : "") + "Only the local player is simulated here; other players publish no state in this test, so never report them as missing." });
       if (res && res.ok === false) for (const i of (res.issues || []).slice(0, 4)) issues.push(String(i).slice(0, 240));
     } catch (e) { /* the playtest is best effort */ }
   }
@@ -249,15 +261,17 @@ export async function runBuild(room) {
       await log(room, attempt ? `Testing the fixed game (try ${attempt + 1})...` : "Testing the game...");
       const pkg = makePkg(code, man, list, "Game", promptText);
       report = await testGame(pkg, testPlayers.length ? testPlayers : null, 900);
+      report.pkg = pkg;
       if (report.ok) {
-        const issues = await playtest(room, report, list, base);
-        if (issues.length) { report.ok = false; report.note = "Playtest found: " + issues.join(" | "); report.errors = issues.slice(); }
+        const issues = await playtest(room, report, list, base, testPlayers);
+        if (issues.length) { report.ok = false; report.soft = true; report.note = "Playtest found: " + issues.join(" | "); report.errors = issues.slice(); }
       }
       if (report.ok) { await log(room, "The game runs. No errors."); break; }
       const why = report.errors.length ? report.errors[0] : report.frozen ? "the screen never changes" : report.blank ? "the screen stays blank" : "the game hung";
       await log(room, `Problem found: ${String(why).slice(0, 140)}`);
+      if (report.soft && attempt >= 1) { await log(room, "The playtester still has doubts, but nothing is broken. Starting the game."); break; }
       if (attempt === 3) { await log(room, "Could not fully fix it. You can still try the game."); break; }
-      const escalate = attempt >= 2;
+      const escalate = attempt >= 2 && !report.soft;
       await log(room, escalate ? "Calling in the bigger model (Sonnet) to fix it..." : "Haiku is fixing it...");
       try {
         const rep = await api("repair", Object.assign({}, base, { code, manifest: man, report, escalate, free: true }));

@@ -116,11 +116,12 @@
     if (a.includes("top")) ay = 0; if (a.includes("bottom")) ay = 1;
     return [(0.5 - ax) * w, (0.5 - ay) * h];
   }
-  const stats = { draws: {}, firstVisible: {} };
+  const stats = { draws: {}, firstVisible: {}, av: { minx: 1e9, maxx: -1e9, miny: 1e9, maxy: -1e9 } };
   function stat(name, x, y, w, h) {
     const s = stats.draws[name] || (stats.draws[name] = { n: 0, vis: 0 });
     s.n++;
     const cx = x, cy = y;
+    if (handles[name] && handles[name].label === "avatar") { const r = stats.av; if (cx < r.minx) r.minx = cx; if (cx > r.maxx) r.maxx = cx; if (cy < r.miny) r.miny = cy; if (cy > r.maxy) r.maxy = cy; }
     if (cx > -w / 2 && cx < W + w / 2 && cy > -h / 2 && cy < H + h / 2 && w >= 12 && h >= 12) {
       s.vis++;
       if (stats.firstVisible[name] == null) stats.firstVisible[name] = G.frame;
@@ -437,7 +438,7 @@
     started = true;
     try { spec.init && spec.init(); } catch (e) { reportErr(e); G.gameError = String(e.message); }
     post({ t: "started" });
-    if (G.test) { runTest(); return; }
+    if (G.test) { if (D.probe) runProbe(); else runTest(); return; }
     running = true; last = performance.now();
     requestAnimationFrame(frame);
   }
@@ -505,6 +506,27 @@
     let h = 0, nonBlack = 0;
     for (let i = 0; i < d.length; i += 4) { h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7) | 0; if (d[i] + d[i + 1] + d[i + 2] > 30) nonBlack++; }
     return { h, nonBlack: nonBlack / (32 * 18) };
+  }
+
+  /* A/B probe: deterministic run, optionally holding one key; returns a 64x36 grayscale fingerprint of the final frame */
+  function fingerprint() {
+    const c = document.createElement("canvas"); c.width = 64; c.height = 36;
+    const g = c.getContext("2d"); g.drawImage(canvas, 0, 0, 64, 36);
+    const d = g.getImageData(0, 0, 64, 36).data, out = [];
+    for (let i = 0; i < d.length; i += 4) out.push((d[i] * 3 + d[i + 1] * 6 + d[i + 2]) / 10 | 0);
+    return out;
+  }
+  function runProbe() {
+    const key = D.probeKey;
+    for (let s = 0; s < 70; s++) { stepOnce(); if (s % 6 === 0) render(); }
+    pendMP = true; mDown = true; stepOnce(); mDown = false; pendMR = true;
+    for (let s = 0; s < 8; s++) stepOnce();
+    if (key) { down.add(key); pendKeys.add(key); }
+    for (let s = 0; s < 16; s++) { stepOnce(); if (s % 2 === 0) render(); }
+    if (key) { down.delete(key); pendRel.add(key); }
+    for (let s = 0; s < 6; s++) stepOnce();
+    render();
+    post({ t: "probedone", fp: fingerprint(), errors: errs.slice() });
   }
 
   /* accelerated headless self-test: random input for N frames, then a report */

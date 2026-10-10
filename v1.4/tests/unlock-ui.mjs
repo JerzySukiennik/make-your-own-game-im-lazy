@@ -1,0 +1,14 @@
+import { createRequire } from "module";
+const require = createRequire("/Users/jurek/Downloads/Claude/Projects/Now In The Future/package.json");
+const { chromium } = require("playwright-core");
+const browser = await chromium.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: true });
+const page = await browser.newPage({ viewport: { width: 1300, height: 800 } });
+await page.goto(process.env.BASE || "http://localhost:5190/");
+await page.fill(".unl-inp", "1111"); await page.press(".unl-inp", "Enter"); await page.waitForTimeout(1200);
+console.log("after wrong:", await page.textContent(".unl"));
+await page.fill(".unl-inp", process.env.UNLOCK_PASS); await page.press(".unl-inp", "Enter"); await page.waitForTimeout(1500);
+console.log("after right:", await page.textContent(".unl"), "| stored:", await page.evaluate(() => !!localStorage.getItem("myog.pass")));
+await page.reload(); await page.waitForTimeout(1500);
+console.log("after reload:", await page.textContent(".unl"), "|", await page.textContent(".aistat"));
+await page.screenshot({ path: (process.env.SP || "/tmp") + "/unlock-menu.png" });
+await browser.close();
