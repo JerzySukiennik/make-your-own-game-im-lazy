@@ -1,0 +1,6 @@
+.env
+node_modules/
+Niepotrzebne/
+.wrangler/
+.DS_Store
+.claude/

@@ -1,0 +1,13 @@
+name = "myog-api"
+main = "src/index.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+DAILY_USD = "3"
+GAMES_PER_IP = "3"
+
+# Create the KV namespace once:  npx wrangler kv namespace create LIMITS   then paste the id here.
+# [[kv_namespaces]]
+# binding = "LIMITS"
+# id = "PASTE_ID_HERE"
