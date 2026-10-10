@@ -1,0 +1,80 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "lobby": {
+      ".read": true,
+      "$code": {
+        ".write": true,
+        ".validate": "$code.matches(/^[A-Z]{4}$/) && newData.hasChildren(['t','n','phase'])",
+        "name": { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "title": { ".validate": "newData.isString() && newData.val().length <= 80" },
+        "$other": { ".validate": "$other == 't' || $other == 'n' || $other == 'phase' || $other == 'name' || $other == 'title'" }
+      }
+    },
+    "rooms": {
+      "$code": {
+        ".read": true,
+        ".write": "$code.matches(/^[A-Z]{4}$/)",
+        "meta": {
+          "name": { ".validate": "newData.isString() && newData.val().length <= 40" }
+        },
+        "players": {
+          "$pid": {
+            "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "color": { ".validate": "newData.isString() && newData.val().length <= 9" }
+          }
+        },
+        "prompt": {
+          "$k": {
+            ".validate": "newData.hasChildren(['k'])",
+            "s": { ".validate": "newData.isString() && newData.val().length <= 1300" },
+            "ids": { ".validate": "newData.isString() && newData.val().length <= 20000" }
+          }
+        },
+        "assets": {
+          "$aid": {
+            "name": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "desc": { ".validate": "newData.isString() && newData.val().length <= 600" },
+            "snd": { ".validate": "newData.isString() && newData.val().length <= 110000" },
+            "svg": { ".validate": "newData.isString() && newData.val().length <= 65000" },
+            "bb": { ".validate": "newData.isString() && newData.val().length <= 200" },
+            "rig": { ".validate": "newData.isString() && newData.val().length <= 4000" }
+          }
+        },
+        "strokes": { "$aid": { "$sid": { "d": { ".validate": "newData.isString() && newData.val().length <= 65000" } } } },
+        "live": { "$aid": { "$pid": { "d": { ".validate": "newData.isString() && newData.val().length <= 9000" } } } },
+        "review": { "$r": { "ask": { ".validate": "newData.isString() && newData.val().length <= 25000" }, "eval": { ".validate": "newData.isString() && newData.val().length <= 25000" } } },
+        "ans": { "$r": { "$q": { "$pid": { ".validate": "newData.isString() && newData.val().length <= 160" } } } },
+        "build": { "log": { "$k": { "m": { ".validate": "newData.isString() && newData.val().length <= 400" } } } },
+        "feedback": { "$k": { "text": { ".validate": "newData.isString() && newData.val().length <= 1000" } } },
+        "game": {
+          "pkg": { ".validate": "newData.isString() && newData.val().length <= 6500000" },
+          "thumb": { ".validate": "newData.isString() && newData.val().length <= 45000" }
+        },
+        "play": { "$gen": { "st": { "$pid": { "v": { ".validate": "newData.isString() && newData.val().length <= 9000" } } }, "ev": { "$k": { "d": { ".validate": "newData.isString() && newData.val().length <= 21000" } } }, "sh": { "$k": { "v": { ".validate": "newData.isString() && newData.val().length <= 65000" } } } } }
+      }
+    },
+    "gallery": {
+      "index": {
+        ".read": true,
+        "$id": {
+          ".write": "!data.exists()",
+          ".validate": "newData.hasChildren(['title','t'])",
+          "title": { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "authors": { ".validate": "newData.isString() && newData.val().length <= 120" },
+          "prompt": { ".validate": "newData.isString() && newData.val().length <= 220" },
+          "thumb": { ".validate": "newData.isString() && newData.val().length <= 45000" },
+          "plays": { ".write": "data.exists() && newData.isNumber() && newData.val() == data.val() + 1" }
+        }
+      },
+      "games": {
+        "$id": {
+          ".read": true,
+          ".write": "!data.exists()",
+          "pkg": { ".validate": "newData.isString() && newData.val().length <= 6500000" }
+        }
+      }
+    }
+  }
+}
