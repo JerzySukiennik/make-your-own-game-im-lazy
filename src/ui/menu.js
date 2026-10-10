@@ -1,5 +1,6 @@
 import { h, ls, toast } from "../util.js";
 import { health } from "../ai/client.js";
+import { unlockBox } from "./unlock.js";
 
 export function menuView(app) {
   const hits = (ls("hits") || 1336) + 1;
@@ -34,7 +35,8 @@ export function menuView(app) {
         }),
         big("Multiplayer", "up to 6 friends draw the same game", () => { if (need()) app.go("lobby"); }),
         big("Gallery", "play games other people made", () => app.go("gallery")),
-        status),
+        status,
+        unlockBox()),
       h("div", { class: "how win" },
         h("div", { class: "win-title" }, h("span", { class: "blink-dot" }), "HOW IT WORKS", h("span", { class: "x" }, "?")),
         h("ol", null,

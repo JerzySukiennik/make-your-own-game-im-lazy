@@ -15,13 +15,20 @@ const memory = new Map();
 async function kvGet(env, k) { if (env.LIMITS) return parseFloat((await env.LIMITS.get(k)) || "0"); return memory.get(k) || 0; }
 async function kvPut(env, k, v) { if (env.LIMITS) return env.LIMITS.put(k, String(v), { expirationTtl: 172800 }); memory.set(k, v); }
 
+function same(a, b) {
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+
 function day() { return new Date().toISOString().slice(0, 10); }
 function cors(req) {
   const o = req.headers.get("origin") || "";
   const ok = ORIGINS.some((r) => r.test(o));
   return {
     "access-control-allow-origin": ok ? o : "https://gzowo.fun",
-    "access-control-allow-headers": "content-type",
+    "access-control-allow-headers": "content-type, x-myog-pass",
     "access-control-allow-methods": "POST, GET, OPTIONS",
     "vary": "origin"
   };
@@ -116,9 +123,19 @@ export default {
     const perIpGames = parseInt(env.GAMES_PER_IP || "3", 10);
     const isMock = !env.ANTHROPIC_API_KEY && env.MOCK === "1";
 
+    const pass = req.headers.get("x-myog-pass") || "";
+    const unlocked = !!env.UNLOCK_PASS && pass.length > 0 && same(pass, env.UNLOCK_PASS);
+
     if (path === "/api/health") {
       const spent = await kvGet(env, "usd:" + day());
-      return json(req, { ok: true, mock: isMock, haveKey: !!env.ANTHROPIC_API_KEY, spent: +spent.toFixed(4), budget });
+      return json(req, { ok: true, mock: isMock, haveKey: !!env.ANTHROPIC_API_KEY, spent: +spent.toFixed(4), budget, unlocked });
+    }
+    if (path === "/api/unlock") {
+      const ipu = req.headers.get("cf-connecting-ip") || "local";
+      const bad = await kvGet(env, `ip:${ipu}:${day()}:bad`);
+      if (bad >= 20) return json(req, { ok: false, error: "Too many wrong tries today." }, 429);
+      if (!unlocked) { await kvPut(env, `ip:${ipu}:${day()}:bad`, bad + 1); return json(req, { ok: false }, 200); }
+      return json(req, { ok: true });
     }
     if (req.method !== "POST") return json(req, { error: "POST only" }, 405);
     const stage = path.replace("/api/", "");
@@ -137,8 +154,9 @@ export default {
     const spent = await kvGet(env, "usd:" + d);
     if (!isMock && spent >= budget) return json(req, { error: "The daily AI budget is used up. Come back tomorrow! Games in the gallery still work.", code: "budget" }, 429);
     const calls = await kvGet(env, `ip:${ip}:${d}:calls`);
-    if (!isMock && calls >= 80) return json(req, { error: "Too many AI calls from your connection today.", code: "ip" }, 429);
-    const countsAsGame = stage === "code" && !p.free && !isMock;
+    if (!isMock && !unlocked && calls >= 80) return json(req, { error: "Too many AI calls from your connection today.", code: "ip" }, 429);
+    const isRebuild = !!(p.rebuild && p.rebuild.code);
+    const countsAsGame = stage === "code" && !p.free && !isMock && !isRebuild && !unlocked;
     if (countsAsGame) {
       const g = await kvGet(env, `ip:${ip}:${d}:games`);
       if (g >= perIpGames) return json(req, { error: `Limit: ${perIpGames} new games per day from one connection. Rebuilding by fixing bugs is free.`, code: "games" }, 429);

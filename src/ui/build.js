@@ -1,4 +1,5 @@
 import { h, fill } from "../util.js";
+import { unlockBox } from "./unlock.js";
 
 export function buildView(app, room, hooks) {
   const logEl = h("div", { class: "loglines" });
@@ -17,6 +18,7 @@ export function buildView(app, room, hooks) {
       title.textContent = "Something broke";
       fill(actions, 
         h("div", { class: "err" }, b.err || "Unknown error"),
+        b.code === "games" ? unlockBox(() => {}) : null,
         room.isHost() ? h("button", { class: "btn big", onclick: hooks.retry }, "Try again") : h("span", { class: "hint" }, "The host can retry."),
         room.isHost() ? h("button", { class: "btn", onclick: hooks.back }, "Back to drawing") : null);
     } else { spinner.style.display = ""; title.textContent = "Haiku is building your game..."; fill(actions, ); }

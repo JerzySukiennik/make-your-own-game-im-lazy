@@ -28,7 +28,7 @@ const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });
 const errs = [];
 page.on("pageerror", (e) => errs.push("pageerror " + e.message));
 page.on("console", (m) => { if (m.type() === "error") errs.push("console " + m.text()); });
-await page.goto("http://localhost:5190/");
+await page.goto(process.env.BASE || "http://localhost:5190/");
 await page.evaluate(async ({ sc, ai }) => {
   const { fixtureAssets } = await import("/tests/fixtures.js");
   MYOG.setName("Jurek");
