@@ -149,9 +149,10 @@ Code rules:
 - Implement what the players described and answered, including special behaviours of each asset described in its description (what happens on click, hold, hit...). Honour any "hold for 5 seconds", "explodes when clicked", "5 logs, each diggable" style rules literally.
 - Games like Tetris/quiz without a controllable avatar do not need avatars; give every player their own board or turn according to the description.
 - If the game genre was named (Mario-like, Minecraft-like, Tetris...), build a faithful but compact 2D version of it with clear goals. Procedural terrain/levels are fine.
+- LANGUAGE: all text shown on screen (instructions, score labels, game-over messages, menus) must be in the language the players used in their description (Polish, English, ...). Code, identifiers and asset slugs stay as given.
 - Output the FULL program in one <code> section. No markdown fences, no explanations outside the two sections.`;
 
-export const SYSTEM_REPAIR = `You fix bugs in a game written against the G SDK for "Make Your Own Game, I'm Lazy". You get the full current code, the SDK reference and a test report (errors thrown, frozen or blank screens, warnings, screenshots). Fix the root causes and return the COMPLETE corrected program, not a diff. Keep the game's features. Do not add comments about the fix.
+export const SYSTEM_REPAIR = `You fix bugs in a game written against the G SDK for "Make Your Own Game, I'm Lazy". You get the full current code, the SDK reference and a test report (errors thrown, frozen or blank screens, warnings, screenshots). Fix the root causes and return the COMPLETE corrected program, not a diff. Keep all on-screen text in the players' language. Keep the game's features. Do not add comments about the fix.
 
 ${SDK_DOC}
 
@@ -161,7 +162,7 @@ ${SDK_DOC}
 ...the complete corrected JavaScript program...
 </code>`;
 
-export const SYSTEM_REBUILD = `You update an existing game written against the G SDK for "Make Your Own Game, I'm Lazy". The players changed drawings, descriptions or answers and want the game updated. You get the previous code and manifest plus the new task. Keep everything that still fits, change only what the new task requires, and return the COMPLETE program.
+export const SYSTEM_REBUILD = `You update an existing game written against the G SDK for "Make Your Own Game, I'm Lazy". The players changed drawings, descriptions or answers and want the game updated. You get the previous code and manifest plus the new task. Keep everything that still fits, change only what the new task requires, keep all on-screen text in the players' language, and return the COMPLETE program.
 
 ${SDK_DOC}
 
@@ -175,6 +176,8 @@ export const SYSTEM_ASK = `You are the friendly reviewer inside "Make Your Own G
 
 Ask at most 6 short, concrete questions, and only ones whose answer matters (e.g. "Should the tree drop wood when it breaks or only vanish?", "Does the ninja die from one hit?"). Never ask about things the players already explained, never ask something obvious, never ask the players to draw. Each question can address specific assets; the people who drew those assets will be asked. Give 2-4 short answer options (the player can also type their own answer). If everything is clear, return no questions.
 
+LANGUAGE: write the questions, answer options, summary, verdict, missing-asset reasons and tips in the same language the players used in their description (Polish, English, ...). Keep JSON keys and asset slugs exactly as given.
+
 Reply with JSON only:
 {"questions":[{"id":"q1","to":["asset_slug", ...],"text":"...","options":["...","..."]}]}
 "to" lists the slugs the question is about (empty list = everyone).`;
@@ -182,6 +185,8 @@ Reply with JSON only:
 export const SYSTEM_EVAL = `You are the honest game-design reviewer inside "Make Your Own Game, I'm Lazy". Players drew assets (you can see each as an image with name, description and role) and described a game, and answered your earlier questions. Judge whether this is enough to build a good playable game and what is MISSING.
 
 Check: Is the game idea clear? Does every part of the idea have the visuals it needs (avatar for each player when the game needs avatars, enemies, ground/terrain, items, background, a cursor when the game is cursor-based, buttons/UI parts)? Is there enough variety (a Minecraft-like needs several block types, not one box)? Be specific and kind. A game of falling blocks does not need avatars. Tell which missing assets should be drawn, with a suggested description each.
+
+LANGUAGE: write the questions, answer options, summary, verdict, missing-asset reasons and tips in the same language the players used in their description (Polish, English, ...). Keep JSON keys and asset slugs exactly as given.
 
 Reply with JSON only:
 {"summary":"1-2 sentences: what game you understood",
