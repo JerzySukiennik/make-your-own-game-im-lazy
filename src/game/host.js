@@ -65,7 +65,7 @@ export async function testGame(pkg, players, steps) {
   const e2 = Array.from(new Set(errors.concat(result.errors || [])));
   return {
     steps: steps || 900, errors: e2, frozen: !!result.frozen, blank: !!result.blank, timeout: !!result.timeout,
-    warns: Array.from(new Set(warns.concat(result.warns || []))), keys: result.keys || [], shots: result.shots || [],
+    warns: Array.from(new Set(warns.concat(result.warns || []))), keys: result.keys || [], shots: result.shots || [], calm: result.calm || [], stats: result.stats || null,
     ok: !e2.length && !result.frozen && !result.blank && !result.timeout
   };
 }

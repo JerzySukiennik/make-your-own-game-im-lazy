@@ -2,7 +2,7 @@
    The key lives in the Worker secret ANTHROPIC_API_KEY and never reaches the browser.
    Prompts live here, so visitors cannot use this as a free general-purpose proxy. */
 
-import { SYSTEM_CODE, SYSTEM_REPAIR, SYSTEM_REBUILD, SYSTEM_ASK, SYSTEM_EVAL, SYSTEM_SVG } from "./prompts.mjs";
+import { SYSTEM_CODE, SYSTEM_REPAIR, SYSTEM_REBUILD, SYSTEM_ASK, SYSTEM_EVAL, SYSTEM_SVG, SYSTEM_QA } from "./prompts.mjs";
 import { mock } from "./mock.mjs";
 
 const HAIKU = "claude-haiku-5-5";
@@ -56,7 +56,9 @@ function taskText(p) {
     `GAME DESCRIPTION (written together by the players):\n${String(p.prompt || "").slice(0, 1500) || "(empty: invent a fitting game from the drawings)"}`,
     `PLAYERS (${(p.players || []).length}): ${players || "1 player"}`,
     qa ? `PLAYER ANSWERS TO YOUR QUESTIONS:\n${qa.slice(0, 3000)}` : "",
+    p.prevPrompt && p.prevPrompt !== p.prompt ? `THE DESCRIPTION CHANGED since the last version. Previous description: ${String(p.prevPrompt).slice(0, 1200)}\nApply what changed, and treat any problem the players mention as a bug report to fix first.` : "",
     p.eval ? `REVIEW NOTES:\n${JSON.stringify(p.eval).slice(0, 2000)}` : "",
+    (p.feedback || []).length ? `PLAYER FEEDBACK ON THE CURRENT VERSION (fix these problems FIRST, they come from people who just played it):\n${(p.feedback || []).map((f) => "- " + String(f).slice(0, 700)).join("\n").slice(0, 4000)}` : "",
     p.aiAssets ? "Some assets are AI-made placeholders (marked)." : ""
   ].filter(Boolean).join("\n\n");
 }
@@ -120,7 +122,7 @@ export default {
     }
     if (req.method !== "POST") return json(req, { error: "POST only" }, 405);
     const stage = path.replace("/api/", "");
-    if (!["ask", "eval", "svg", "code", "repair"].includes(stage)) return json(req, { error: "unknown stage" }, 404);
+    if (!["ask", "eval", "svg", "code", "repair", "qa"].includes(stage)) return json(req, { error: "unknown stage" }, 404);
     if (!isMock && !env.ANTHROPIC_API_KEY) return json(req, { error: "The AI is not switched on yet (no API key on the server)." }, 503);
 
     const origin = req.headers.get("origin") || "";
@@ -159,6 +161,13 @@ export default {
       } else if (stage === "svg") {
         const want = (p.missing || []).slice(0, 8).map((m) => `- ${String(m.name).slice(0, 40)}: ${String(m.desc || "").slice(0, 200)}`).join("\n");
         const r = await claude(env, HAIKU, SYSTEM_SVG, [...base, { type: "text", text: "Draw these missing assets:\n" + want }], 9000, "low");
+        usd = r.usd; out = parseJSON(r.text);
+      } else if (stage === "qa") {
+        const shots = (p.calm || []).slice(0, 2).flatMap((s, i) => {
+          const m = String(s).match(/^data:(image\/jpeg);base64,(.*)$/);
+          return m && m[2].length < 140000 ? [{ type: "text", text: i ? "Screenshot at 0.8 s:" : "Screenshot at 0.25 s:" }, { type: "image", source: { type: "base64", media_type: m[1], data: m[2] } }] : [];
+        });
+        const r = await claude(env, HAIKU, SYSTEM_QA, [...base.filter((b) => b.type === "text"), ...shots, { type: "text", text: "Measured by the engine: " + String(p.measure || "").slice(0, 600) }], 2500, "low");
         usd = r.usd; out = parseJSON(r.text);
       } else if (stage === "code") {
         const rebuild = p.rebuild && p.rebuild.code;

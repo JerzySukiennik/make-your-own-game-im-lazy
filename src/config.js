@@ -14,7 +14,7 @@ export const CFG = {
   maxRounds: 3,
   maxPrompt: 1200,
   maxDesc: 400,
-  api: (location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://myog-api.gzowo.workers.dev"
+  api: (location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://myog-api.kalakasanyt.workers.dev"
 };
 export const COLORS = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#00a8a8", "#d6a800", "#f032e6", "#7a5230", "#000000"];
 export const TEMPLATES = [

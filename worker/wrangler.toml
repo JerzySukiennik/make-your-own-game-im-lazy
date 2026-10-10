@@ -7,7 +7,6 @@ workers_dev = true
 DAILY_USD = "3"
 GAMES_PER_IP = "3"
 
-# Create the KV namespace once:  npx wrangler kv namespace create LIMITS   then paste the id here.
-# [[kv_namespaces]]
-# binding = "LIMITS"
-# id = "PASTE_ID_HERE"
+[[kv_namespaces]]
+binding = "LIMITS"
+id = "2f73ce5a55714f01bb30ba996d83b334"

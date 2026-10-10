@@ -116,6 +116,16 @@
     if (a.includes("top")) ay = 0; if (a.includes("bottom")) ay = 1;
     return [(0.5 - ax) * w, (0.5 - ay) * h];
   }
+  const stats = { draws: {}, firstVisible: {} };
+  function stat(name, x, y, w, h) {
+    const s = stats.draws[name] || (stats.draws[name] = { n: 0, vis: 0 });
+    s.n++;
+    const cx = x, cy = y;
+    if (cx > -w / 2 && cx < W + w / 2 && cy > -h / 2 && cy < H + h / 2 && w >= 12 && h >= 12) {
+      s.vis++;
+      if (stats.firstVisible[name] == null) stats.firstVisible[name] = G.frame;
+    }
+  }
   const warned = new Set();
   function warn(m) { if (!warned.has(m)) { warned.add(m); post({ t: "warn", msg: m }); console.warn(m); } }
   G.has = (name) => !!handles[name];
@@ -130,6 +140,7 @@
     if (a.blank) return;
     const [w, h] = sizeOf(name, a, opt);
     const off = anchorOffset(opt.anchor, w, h);
+    if (G.test) { const m = ctx.getTransform(); stat(name, x + off[0], y + off[1], w, h); }
     Art.drawAsset(ctx, a.art, x + off[0], y + off[1], w, h, { anim: opt.anim, t: opt.t == null ? G.time : opt.t, rot: opt.rot, flip: opt.flip, flipY: opt.flipY, alpha: opt.alpha });
   };
   G.box = function (name, x, y, opt) {
@@ -503,24 +514,27 @@
     const sigs = [], shots = [];
     const keysAll = () => (usedKeys.size ? Array.from(usedKeys) : ["left", "right", "up", "down", "space"]);
     let held = new Set();
+    const calm = [];
     for (let s = 0; s < steps; s++) {
-      if (s % 20 === 0) {
+      const quiet = s < 70;
+      if (!quiet && s % 20 === 0) {
         const ks = keysAll();
         held.forEach((k) => { if (rr() < .5) { held.delete(k); down.delete(k); pendRel.add(k); } });
         const k = ks[Math.floor(rr() * ks.length)];
         if (k && !held.has(k)) { held.add(k); down.add(k); pendKeys.add(k); }
         if (rr() < .3) { const k2 = ks[Math.floor(rr() * ks.length)]; if (!held.has(k2)) { held.add(k2); down.add(k2); pendKeys.add(k2); } }
       }
-      if (s % 7 === 0) { mx = G.clamp(mx + (rr() - .5) * 260, 0, W); my = G.clamp(my + (rr() - .5) * 200, 0, H); }
-      if (s % 41 === 0) { mDown = true; pendMP = true; } else if (s % 41 === 6) { mDown = false; pendMR = true; }
+      if (!quiet && s % 7 === 0) { mx = G.clamp(mx + (rr() - .5) * 260, 0, W); my = G.clamp(my + (rr() - .5) * 200, 0, H); }
+      if (!quiet && s % 41 === 0) { mDown = true; pendMP = true; } else if (!quiet && s % 41 === 6) { mDown = false; pendMR = true; }
       stepOnce();
-      const draw = s % 6 === 0 || s === steps - 1;
+      const draw = s % 6 === 0 || s === steps - 1 || s === 14 || s === 49;
       if (draw) render();
+      if (s === 14 || s === 49) calm.push(shot(480, 270));
       if (s === 60 || s === 300 || s === steps - 1) { sigs.push(sig()); if (s === 300 || s === steps - 1) shots.push(shot(320, 180)); }
     }
     const frozen = sigs.length >= 2 && sigs.every((x) => x.h === sigs[0].h);
     const blank = sigs.every((x) => x.nonBlack < 0.01);
-    post({ t: "testdone", errors: errs.slice(), frozen, blank, steps, keys: Array.from(usedKeys), shots, warns: Array.from(warned) });
+    post({ t: "testdone", errors: errs.slice(), frozen, blank, steps, keys: Array.from(usedKeys), shots, calm, stats, warns: Array.from(warned) });
   }
 
   function dataToBuf(url) {

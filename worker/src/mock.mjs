@@ -74,6 +74,7 @@ export function mock(stage, p) {
     return { summary: "A cooperative catch-the-things game (mock review).", score: assets.length >= 3 ? 8 : 5, verdict: assets.length >= 3 ? "Enough to build a fun game." : "Playable, but thin.", missing, tips: ["Add a second kind of collectible for variety."] };
   }
   if (stage === "svg") return { assets: (p.missing || []).map((m) => ({ name: m.name, svg: svgFor(m.name) })) };
+  if (stage === "qa") return { ok: true, issues: [] };
   if (stage === "repair") return { code: p.code, manifest: p.manifest || {} };
   const man = { title: (String(p.prompt || "").split(/[.\n]/)[0] || "Mock Game").slice(0, 40) || "Mock Game", assets: {}, players: { min: 1, max: 6 }, controls: "Arrows and Space" };
   for (const a of assets) {

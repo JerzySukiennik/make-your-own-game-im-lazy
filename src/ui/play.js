@@ -1,4 +1,5 @@
 import { h, toast } from "../util.js";
+import { FEEDBACK } from "../feedback.js";
 import { mountGame } from "../game/host.js";
 import { bridge } from "../game/bridge.js";
 import { publish } from "../flow.js";
@@ -35,8 +36,34 @@ export function playView(app, room, hooks) {
       if (t === null) return;
       try { await publish(room, t); toast("Published to the Gallery!"); } catch (e) { toast(e.message); }
     } }, "Publish to gallery"),
+    h("button", { class: "btn", onclick: () => openFeedback() }, "Feedback"),
     h("button", { class: "btn", onclick: () => { if (!host()) { toast("Only the host can restart"); return; } hooks.restart(); } }, "Restart"),
     h("button", { class: "btn big", onclick: () => { if (!host()) { toast("Only the host can start editing"); return; } hooks.edit(); } }, "Edit & rebuild"));
+
+  function openFeedback() {
+    if (document.querySelector(".fb-back")) return;
+    const picked = new Set();
+    const text = h("textarea", { rows: 3, maxlength: 500, placeholder: "Anything else? e.g. \"the red player is invisible\" or \"apples are too small\"" });
+    const back = h("div", { class: "fb-back" });
+    const close = () => back.remove();
+    const send = h("button", { class: "btn huge", onclick: async () => {
+      if (!picked.size && !text.value.trim()) { toast("Pick at least one thing or write a line"); return; }
+      send.disabled = true;
+      const diag = [];
+      if (errs.length) diag.push("Runtime errors seen while playing: " + errs.slice(0, 4).join(" | "));
+      diag.push(`Players in the room: ${room.playerList().length}${room.meta.solo ? " (single player)" : ""}.`);
+      const lines = [...picked].map((k) => FEEDBACK.find((f) => f.id === k).hint);
+      if (text.value.trim()) lines.push("In the players' words: " + text.value.trim());
+      lines.push(diag.join(" "));
+      close();
+      await hooks.feedback(lines.join(" "));
+    } }, "Send and let Haiku fix it");
+    const chips = h("div", { class: "fb-chips" }, FEEDBACK.map((f) => h("button", { class: "chip-btn fb", onclick: (e) => { if (picked.has(f.id)) { picked.delete(f.id); e.target.classList.remove("on"); } else { picked.add(f.id); e.target.classList.add("on"); } } }, f.label)));
+    back.append(h("div", { class: "win fb" },
+      h("div", { class: "win-title" }, h("span", { class: "blink-dot" }), "WHAT IS WRONG WITH THE GAME?", h("button", { class: "x", onclick: close }, "X")),
+      h("div", { class: "pad" }, h("p", { class: "hint" }, "Tap everything that applies. Haiku reads it, fixes the game and starts it again."), chips, text, h("div", { class: "row2" }, send, h("button", { class: "btn", onclick: close }, "Cancel")))));
+    document.body.append(back);
+  }
 
   const offG = room.on("game", () => {});
   start();

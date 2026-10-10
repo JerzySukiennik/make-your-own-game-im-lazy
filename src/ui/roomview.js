@@ -52,7 +52,13 @@ export function roomView(app, { room }) {
   };
   const hooksPlay = {
     restart: async () => { const g = room.meta.gen || 1; await room.setMeta({ gen: g + 1 }); room.b.remove(`${room.p}/play/${g}`); },
-    edit: async () => { await room.resetReady(); await room.setMeta({ phase: "draw", rebuild: true }); }
+    edit: async () => { await room.resetReady(); await room.setMeta({ phase: "draw", rebuild: true }); },
+    feedback: async (text) => {
+      await room.b.push(`${room.p}/feedback`, { by: room.me.id, text: String(text).slice(0, 900), t: room.b.now() });
+      toast("Thanks! Haiku is fixing it...", 3000);
+      await room.resetReady();
+      await room.setMeta({ phase: "build", rebuild: true, fix: true });
+    }
   };
 
   function runBuildOnce(force) {

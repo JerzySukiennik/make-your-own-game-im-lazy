@@ -19,6 +19,8 @@ const LIB = {
   sky: () => ({ kind: "vector", strokes: [F("#7ec8ff", box(0, 0, 1000, 1000)), F("#fff", [circle(250, 250, 160, 70)]), F("#fff", [circle(700, 380, 200, 80)])] })
 };
 
+LIB.cosmonaut = LIB.robot; LIB.modules = LIB.tree; LIB.background = LIB.sky;
+
 export function fixtureAssets(names, labels) {
   labels = labels || {};
   return names.map((name, i) => {

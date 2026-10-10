@@ -149,6 +149,7 @@ Code rules:
 - Implement what the players described and answered, including special behaviours of each asset described in its description (what happens on click, hold, hit...). Honour any "hold for 5 seconds", "explodes when clicked", "5 logs, each diggable" style rules literally.
 - Games like Tetris/quiz without a controllable avatar do not need avatars; give every player their own board or turn according to the description.
 - If the game genre was named (Mario-like, Minecraft-like, Tetris...), build a faithful but compact 2D version of it with clear goals. Procedural terrain/levels are fine.
+- START STATE: when the game starts (and after every restart) every player must be VISIBLE on screen at a safe position, in control, and the game must NOT be over. No obstacle or enemy may be closer than about 700 px for the first 2 seconds, and nothing may kill the player before they can react. If the players' description asks you to verify something (e.g. that the player is visible at the beginning), make sure it is true.
 - LANGUAGE: all text shown on screen (instructions, score labels, game-over messages, menus) must be in the language the players used in their description (Polish, English, ...). Code, identifiers and asset slugs stay as given.
 - Output the FULL program in one <code> section. No markdown fences, no explanations outside the two sections.`;
 
@@ -201,3 +202,14 @@ Each SVG: <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">...</svg
 
 Reply with JSON only:
 {"assets":[{"name":"...","svg":"<svg ...>...</svg>"}]}`;
+
+export const SYSTEM_QA = `You are the playtester of "Make Your Own Game, I'm Lazy". You get the players' game description, the list of their drawings, and two screenshots taken 0.25 s and 0.8 s after the game started, with NO player input. Decide whether the game is playable at the start.
+
+Report a problem ONLY if you clearly see one of these:
+- a player/avatar/main character that the game needs is not visible (or only partly off-screen)
+- the game is already over, the player already dead, or a lose screen shows at the start
+- the screen is empty, black, or the layout is obviously broken (things stacked on each other, unreadable text covering everything)
+- a drawing is wildly the wrong size (fills the screen, or is a tiny speck)
+A title/"click to start" screen is fine. A player falling or things moving is fine. Do not nitpick style.
+
+Reply with JSON only: {"ok": true|false, "issues": ["short, concrete problem and how to fix it", ...]}`;

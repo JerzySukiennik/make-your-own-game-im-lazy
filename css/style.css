@@ -212,3 +212,11 @@ textarea{resize:vertical}
 .gby{font-size:12px;color:#333}
 .gprompt{font-size:12px;color:#555;max-height:3.4em;overflow:hidden}
 @media(max-width:700px){.room-row{grid-template-columns:60px 1fr 70px}.room-row .rp,.room-row .rph{display:none}}
+
+/* feedback dialog */
+.fb-back{position:fixed;inset:0;background:rgba(0,0,20,.72);z-index:1100;display:flex;align-items:center;justify-content:center;padding:14px}
+.win.fb{width:min(620px,100%);margin:0;box-shadow:8px 8px 0 rgba(0,0,0,.6)}
+.fb-chips{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 10px}
+.chip-btn.fb{padding:4px 10px;font-size:13px}
+.chip-btn.fb.on{background:#ffec55;border-width:3px}
+.win.fb textarea{margin-bottom:10px}

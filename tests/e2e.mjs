@@ -5,6 +5,10 @@ const require = createRequire("/Users/jurek/Downloads/Claude/Projects/Now In The
 const { chromium } = require("playwright-core");
 
 const SC = {
+  flappy: {
+    prompt: "A flappy bird style game but the pipes are ISS modules and the gravity is low. Verify that the player is visible at the beginning and the game works.",
+    assets: [["cosmonaut", "the avatar - you hold to fly up and do nothing to fly down.", "avatar"], ["modules", "The modules - after touching it should kill the player and restart the game", ""], ["background", "the background", "bg"]]
+  },
   fruit: {
     prompt: "Fruit and bombs fly across the screen. Each player slices them with their own cursor. Most points wins.",
     assets: [["apple", "a juicy red apple. When sliced it splits into two halves that fall away.", ""], ["bomb", "a black round bomb with a lit fuse. Slicing it makes it explode.", ""], ["blade_cursor", "my sword cursor", "cursor"], ["dojo", "a japanese dojo wall background", "bg"]]
@@ -76,6 +80,19 @@ for (let k = 0; k < 6; k++) {
 for (const key of ["ArrowRight", "ArrowRight", "Space"]) { await page.keyboard.down(key); await page.waitForTimeout(500); await page.keyboard.up(key); }
 await page.waitForTimeout(1500);
 await page.screenshot({ path: SP + `/e2e-${name}-play2.png` });
+if (process.env.FEEDBACK) {
+  const g0 = await page.evaluate(() => MYOG.room.meta.gen);
+  await page.evaluate(() => [...document.querySelectorAll(".playbar .btn")].find((b) => b.textContent === "Feedback").click());
+  await page.waitForSelector(".fb-back");
+  await page.click(".chip-btn.fb:nth-child(2)");
+  await page.fill(".win.fb textarea", "the blade cursor is hard to see, make it bigger");
+  const t2 = Date.now();
+  await page.click(".win.fb .btn.huge");
+  await wait((g) => MYOG.room.meta.phase === "play" && MYOG.room.meta.gen > g, g0, 300000);
+  console.log("feedback fix secs:", Math.round((Date.now() - t2) / 1000), JSON.stringify(await page.evaluate(async () => Object.values(await MYOG.room.b.get(MYOG.room.p + "/build/log")).map((x) => x.m))));
+  await page.waitForTimeout(1500); await page.mouse.click(680, 480); await page.waitForTimeout(2500);
+  await page.screenshot({ path: SP + `/e2e-${name}-feedback.png` });
+}
 if (process.env.REBUILD) {
   await page.evaluate(() => [...document.querySelectorAll(".btn")].find((b) => b.textContent === "Edit & rebuild").click());
   await wait(() => MYOG.room.meta.phase === "draw" && MYOG.room.meta.rebuild, null, 20000);

@@ -11,7 +11,7 @@ Players draw the assets (vector or pixel art, optional rig and sound), describe 
 
 ## Run locally
 ```
-cp .env.example .env      # put ANTHROPIC_API_KEY in .env (no key = mock AI)
+echo "ANTHROPIC_API_KEY=your-key" > .env   # no .env = mock AI
 node tools/dev-server.mjs 5190
 ```
 Open http://localhost:5190 . Single player works offline; multiplayer and gallery use Firebase.

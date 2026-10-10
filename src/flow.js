@@ -62,7 +62,7 @@ function forAI(list) {
 
 function pkgAssets(list) {
   return list.filter((a) => a.content || a.snd).map((a) => ({
-    id: a.id, name: a.slug, label: a.label, owner: a.owner, kind: a.kind, grid: a.grid, bb: a.bb, rig: a.rig, svg: a.svg, snd: a.snd, ai: a.ai,
+    id: a.id, name: a.slug, desc: a.desc, label: a.label, owner: a.owner, kind: a.kind, grid: a.grid, bb: a.bb, rig: a.rig, svg: a.svg, snd: a.snd, ai: a.ai,
     strokes: a.kind === "svg" ? [] : a._strokes
   }));
 }
@@ -158,8 +158,31 @@ function ensureManifest(man, list) {
   return man;
 }
 
-function makePkg(code, man, list, title) {
-  return { v: 1, title: man.title || title, code, manifest: man, assets: pkgAssets(list) };
+function makePkg(code, man, list, title, prompt) {
+  return { v: 1, title: man.title || title, prompt: String(prompt || "").slice(0, 1200), code, manifest: man, assets: pkgAssets(list) };
+}
+
+async function playtest(room, report, list, base) {
+  const issues = [];
+  const st = (report.stats && report.stats.draws) || {};
+  const fv = (report.stats && report.stats.firstVisible) || {};
+  const avatars = list.filter((a) => a.label === "avatar" && a.content);
+  const measure = [];
+  for (const a of avatars) {
+    const s = st[a.slug];
+    measure.push(`${a.slug}: drawn ${s ? s.n : 0}x, visible ${s ? s.vis : 0}x, first visible at frame ${fv[a.slug] == null ? "never" : fv[a.slug]}`);
+  }
+  const players = room.playerList().length || 1;
+  if (avatars.length && !avatars.some((a) => st[a.slug] && st[a.slug].vis > 0)) issues.push("No avatar drawing is ever drawn visibly on screen. Draw every player with G.drawPlayer(player, x, y, {h: ~100}) at an on-screen position every frame.");
+  else if (avatars.length && avatars.every((a) => fv[a.slug] == null || fv[a.slug] > 90)) issues.push("The avatar is not visible during the first 1.5 seconds. Players must be visible from the first frame.");
+  if (report.calm && report.calm.length === 2) {
+    try {
+      await log(room, "A playtester is checking the first seconds...");
+      const res = await api("qa", { prompt: base.prompt, assets: forAI(list).map((a) => Object.assign({}, a, { img: undefined })), players: base.players, calm: report.calm, measure: measure.join("; ") });
+      if (res && res.ok === false) for (const i of (res.issues || []).slice(0, 4)) issues.push(String(i).slice(0, 240));
+    } catch (e) { /* the playtest is best effort */ }
+  }
+  return issues;
 }
 
 export async function runBuild(room) {
@@ -195,8 +218,18 @@ export async function runBuild(room) {
 
     let prev = null;
     if (rebuild && room.game && room.game.pkg) { try { prev = JSON.parse(room.game.pkg); } catch (e) {} }
+    if (prev && !list.some((a) => a.content)) {
+      list = (prev.assets || []).map((a) => ({
+        id: a.id, slug: a.name, name: a.name, desc: a.desc || "", label: a.label || "", owner: a.owner || "", ownerName: "", kind: a.kind, grid: a.grid || 64, bb: a.bb, rig: a.rig, svg: a.svg, snd: a.snd, ai: !!a.ai,
+        content: true, aspect: a.bb ? a.bb[2] / a.bb[3] : 1, hasRig: !!(a.rig && a.rig.points && a.rig.points.length), rigRoles: a.rig && a.rig.points ? Array.from(new Set(a.rig.points.map((p) => p.r))) : [], hasSound: !!a.snd, _strokes: a.strokes || []
+      }));
+    }
+    const fbRaw = (await b.get(`${room.p}/feedback`)) || {};
+    const feedback = Object.values(fbRaw).map((f) => f.text).filter(Boolean);
+    if (feedback.length) await log(room, `Reading ${feedback.length} piece${feedback.length > 1 ? "s" : ""} of feedback from the players...`);
     await log(room, prev ? "Haiku is updating the game code..." : "Haiku is writing the game...");
-    const base = { prompt: room.doc.text(), assets: forAI(list), players: playerInfo(room), qa: allQA(room), eval: ev, aiAssets: list.some((a) => a.ai) };
+    const promptText = room.doc.text() || (prev && prev.prompt) || "";
+    const base = { prevPrompt: prev ? prev.prompt : "", prompt: promptText, assets: forAI(list), players: playerInfo(room), qa: allQA(room), eval: ev, aiAssets: list.some((a) => a.ai), feedback };
     let res = await api("code", Object.assign({}, base, prev ? { rebuild: { code: prev.code, manifest: prev.manifest } } : {}));
     let man = ensureManifest(res.manifest, list);
     let code = res.code;
@@ -204,8 +237,12 @@ export async function runBuild(room) {
     let report = null;
     for (let attempt = 0; attempt < 4; attempt++) {
       await log(room, attempt ? `Testing the fixed game (try ${attempt + 1})...` : "Testing the game...");
-      const pkg = makePkg(code, man, list, "Game");
+      const pkg = makePkg(code, man, list, "Game", promptText);
       report = await testGame(pkg, testPlayers.length ? testPlayers : null, 900);
+      if (report.ok) {
+        const issues = await playtest(room, report, list, base);
+        if (issues.length) { report.ok = false; report.note = "Playtest found: " + issues.join(" | "); report.errors = issues.slice(); }
+      }
       if (report.ok) { await log(room, "The game runs. No errors."); break; }
       const why = report.errors.length ? report.errors[0] : report.frozen ? "the screen never changes" : report.blank ? "the screen stays blank" : "the game hung";
       await log(room, `Problem found: ${String(why).slice(0, 140)}`);
@@ -217,12 +254,13 @@ export async function runBuild(room) {
         code = rep.code; man = ensureManifest(rep.manifest && Object.keys(rep.manifest).length ? rep.manifest : man, list);
       } catch (e) { await log(room, "The fixer failed: " + e.message); break; }
     }
-    const pkg = makePkg(code, man, list, "Game");
+    const pkg = makePkg(code, man, list, "Game", promptText);
     const thumb = report && report.shots && report.shots.length ? report.shots[report.shots.length - 1] : "";
     await b.set(`${room.p}/game`, { title: pkg.title, gen: gen + 1, pkg: JSON.stringify(pkg), thumb, ok: !!(report && report.ok), t: b.now() });
     await b.update(`${room.p}/build`, { status: "done" });
     await log(room, "Ready! Starting the game...");
-    await room.setMeta({ phase: "play", gen: gen + 1, rebuild: false });
+    await b.remove(`${room.p}/feedback`);
+    await room.setMeta({ phase: "play", gen: gen + 1, rebuild: false, fix: false });
     await room.resetReady();
   } catch (e) {
     await b.update(`${room.p}/build`, { status: "error", err: e.message, code: e.code || "" });
