@@ -1,0 +1,12 @@
+name = "myog-api"
+main = "src/index.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+DAILY_USD = "3"
+GAMES_PER_IP = "3"
+
+[[kv_namespaces]]
+binding = "LIMITS"
+id = "2f73ce5a55714f01bb30ba996d83b334"

@@ -50,6 +50,7 @@ export class Room {
   async join() {
     const meta = await this.b.get(this.p + "/meta");
     if (!meta) throw new Error("Room not found");
+    if (await this.b.get(`${this.p}/kicked/${this.me.id}`)) throw new Error("The host removed you from this room");
     const pl = (await this.b.get(this.p + "/players")) || {};
     const now = this.b.now();
     const live = Object.entries(pl).filter(([id, v]) => id !== this.me.id && now - (v.ping || 0) < 40000);
@@ -58,6 +59,8 @@ export class Room {
     const color = this.me.color && !used.has(this.me.color) ? this.me.color : (COLORS.find((c) => !used.has(c)) || COLORS[0]);
     this.me.color = color;
     const rec = { name: this.me.name, color, joined: pl[this.me.id] ? pl[this.me.id].joined : now, ready: false, ping: now };
+    this.rec = rec;
+    this._t0 = Date.now();
     await this.b.set(`${this.p}/players/${this.me.id}`, rec);
     this.b.onDisconnectRemove(`${this.p}/players/${this.me.id}`);
     this._listen();
@@ -65,9 +68,32 @@ export class Room {
     return this;
   }
 
+  async _rejoin() {
+    if (this._rejoining || this.closed) return;
+    this._rejoining = true;
+    try {
+      if (await this.b.get(`${this.p}/kicked/${this.me.id}`)) { this._gotKicked(); return; }
+      if (!(await this.b.get(this.p + "/meta"))) return;
+      await this.b.set(`${this.p}/players/${this.me.id}`, Object.assign({}, this.rec, { ready: false, ping: this.b.now() }));
+      this.b.onDisconnectRemove(`${this.p}/players/${this.me.id}`);
+    } finally { this._rejoining = false; }
+  }
+
+  _gotKicked() {
+    if (this.kicked) return;
+    this.kicked = true;
+    this.closed = true;
+    clearInterval(this._hb);
+    this.emit("kicked");
+  }
+
   _beat() {
     if (this.closed) return;
-    this.b.set(`${this.p}/players/${this.me.id}/ping`, this.b.now());
+    if (!this.players[this.me.id]) {
+      if (Date.now() - this._t0 > 4000) this._rejoin();
+    } else {
+      this.b.set(`${this.p}/players/${this.me.id}/ping`, this.b.now());
+    }
     if (this.isHost()) {
       this._lobby();
       const now = this.b.now();
@@ -84,6 +110,7 @@ export class Room {
 
   async leave() {
     this.closed = true;
+    this._leaving = true;
     clearInterval(this._hb);
     this.unsubs.forEach((u) => { try { u(); } catch (e) {} });
     Object.values(this.assetSubs).forEach((a) => a.forEach((u) => { try { u(); } catch (e) {} }));
@@ -112,6 +139,7 @@ export class Room {
       this.emit("players");
       if (this.meta && this.isHost()) this._lobby();
     }));
+    un.push(b.on(p + "/kicked/" + this.me.id, "value", (v) => { if (v) this._gotKicked(); }));
     un.push(b.on(p + "/prompt", "child_added", (op, key) => {
       if (this.doc.apply(op, key)) this.emit("prompt", { remote: op.by !== this.me.id });
     }));
@@ -191,7 +219,7 @@ export class Room {
 
   setReady(v) { return this.b.set(`${this.p}/players/${this.me.id}/ready`, !!v); }
   allReady() { const a = this.activePlayers(); return a.length > 0 && a.every((p) => p.ready); }
-  kick(id) { return this.b.remove(`${this.p}/players/${id}`); }
+  async kick(id) { await this.b.set(`${this.p}/kicked/${id}`, true); await this.b.remove(`${this.p}/players/${id}`); }
   setMeta(patch) { return this.b.update(this.p + "/meta", patch); }
 
   /* ---------- prompt ---------- */

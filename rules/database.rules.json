@@ -47,6 +47,7 @@
         "review": { "$r": { "ask": { ".validate": "newData.isString() && newData.val().length <= 25000" }, "eval": { ".validate": "newData.isString() && newData.val().length <= 25000" } } },
         "ans": { "$r": { "$q": { "$pid": { ".validate": "newData.isString() && newData.val().length <= 160" } } } },
         "build": { "log": { "$k": { "m": { ".validate": "newData.isString() && newData.val().length <= 400" } } } },
+        "kicked": { "$pid": { ".validate": "newData.isBoolean()" } },
         "feedback": { "$k": { "text": { ".validate": "newData.isString() && newData.val().length <= 1000" } } },
         "game": {
           "pkg": { ".validate": "newData.isString() && newData.val().length <= 6500000" },

@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#cde"><canvas id="c" width="1200" height="640"></canvas>
+<script src="../src/art/art.js"></script>
+<script type="module">
+import { fixtureAssets } from "./fixtures.js";
+const [hero, tree, apple, robot] = fixtureAssets(["hero", "tree", "apple", "robot"]);
+for (const a of [hero, tree, apple, robot]) await Art.prepare(a);
+const g = document.getElementById("c").getContext("2d");
+g.fillStyle = "#f4f4f4"; g.fillRect(0, 0, 1200, 640);
+for (let i = 0; i < 6; i++) Art.drawAsset(g, hero, 80 + i * 110, 120, 70, 140, { anim: "walk", t: i / 6 * 0.625 });
+for (let i = 0; i < 3; i++) Art.drawAsset(g, hero, 800 + i * 110, 120, 70, 140, { anim: ["idle", "run", "hop"][i], t: .3 });
+const asp = Art.aspect(tree);
+const pcs = Art.pieces(tree, { mode: "slices", axis: "y", n: 5 }, 1);
+const W = 150, H = W / asp;
+Art.drawAsset(g, tree, 80, 400, W, H, {});
+pcs.forEach((p, i) => g.drawImage(p.c, 300 + p.ox * W + i * 40, 280 + p.oy * H - i * 6 + 20, p.nw * W, p.nh * H));
+const sh = Art.pieces(apple, { mode: "shatter", n: 7 }, 3);
+Art.drawAsset(g, apple, 760, 400, 160, 160, {});
+sh.forEach((p, i) => g.drawImage(p.c, 900 + p.ox * 160 + (p.cx - .5) * 160 * .5 + i * 6, 320 + p.oy * 160 + (p.cy - .5) * 120, p.nw * 160, p.nh * 160));
+Art.drawAsset(g, robot, 1100, 560, 90, 100, { anim: "wobble", t: .2 });
+document.title = "pieces:" + pcs.length + "/" + sh.length;
+</script>

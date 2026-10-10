@@ -110,6 +110,11 @@ export function readiness(room) {
 function setReview(room, round, patch) { return room.b.update(`${room.p}/review/r${round}`, patch); }
 
 export async function startReview(room) {
+  room._reviewBusy = true;
+  try { await startReviewInner(room); } finally { room._reviewBusy = false; }
+}
+
+async function startReviewInner(room) {
   const round = room.meta.round || 1;
   await room.setPhase("review");
   await room.b.set(`${room.p}/review/r${round}`, { status: "asking", t: room.b.now() });
@@ -118,13 +123,18 @@ export async function startReview(room) {
     const res = await api("ask", { prompt: room.doc.text(), assets: forAI(list), players: playerInfo(room), qa: allQA(room) });
     const qs = (res.questions || []).slice(0, 6).map((q, i) => ({ id: "q" + (i + 1), to: (q.to || []).slice(0, 8), text: String(q.text || "").slice(0, 240), options: (q.options || []).slice(0, 4).map((o) => String(o).slice(0, 80)) }));
     await setReview(room, round, { ask: JSON.stringify({ questions: qs }), status: qs.length ? "answering" : "evaluating" });
-    if (!qs.length) await runEval(room);
+    if (!qs.length) await runEvalInner(room);
   } catch (e) {
     await setReview(room, round, { status: "error", err: e.message });
   }
 }
 
 export async function runEval(room) {
+  room._reviewBusy = true;
+  try { await runEvalInner(room); } finally { room._reviewBusy = false; }
+}
+
+async function runEvalInner(room) {
   const round = room.meta.round || 1;
   await setReview(room, round, { status: "evaluating" });
   try {

@@ -106,6 +106,19 @@ export function roomView(app, { room }) {
     }
   }));
   offs.push(room.on("gone", () => { toast("The room was closed"); app.leaveRoom(); }));
+  offs.push(room.on("kicked", () => { toast("The host removed you from the room", 4000); app.leaveRoom(); }));
+  /* watchdog: if the previous host left in the middle of a step, the new host picks it up */
+  const wd = setInterval(() => {
+    if (!room.meta || !room.isHost() || busy) return;
+    const ph = room.meta.phase;
+    if (ph === "build" && !room._building && room.build && room.build.status === "running") runBuildOnce();
+    else if (ph === "review" && !room._reviewBusy) {
+      const r = room.review["r" + (room.meta.round || 1)] || {};
+      if (r.status === "asking") { hooksReview.retry(); }
+      else if (r.status === "evaluating") { runEval(room); }
+    }
+  }, 12000);
+  offs.push(() => clearInterval(wd));
   renderHead(); show();
   if (room.meta && room.meta.phase === "build") runBuildOnce();
 
