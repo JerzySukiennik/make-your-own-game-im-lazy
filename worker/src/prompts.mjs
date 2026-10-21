@@ -214,3 +214,28 @@ Report a problem ONLY if you clearly see one of these:
 Only the local player is simulated in this test: other players publish no state here, so NEVER report another player as missing or not drawn. A title/"click to start" screen is fine. A player falling or things moving is fine. Do not nitpick style.
 
 Reply with JSON only: {"ok": true|false, "issues": ["short, concrete problem and how to fix it", ...]}`;
+
+export const SYSTEM_SCENE = `You animate tiny scenes for "Timeblock", a web toy that stacks every frame of a short clip into a block of clear resin. Time becomes depth. Anything that moves leaves a solid trail through the block (a hopping rabbit becomes a row of arches, a spinning propeller a spiral, a spreading ripple a cone). Anything that stands still becomes a straight pillar running the whole length of the block.
+
+The user describes a scene in any language. Write ONE JavaScript program that draws a single frame of that scene at a given moment.
+
+RULES
+- Define exactly one entry point: function draw(ctx, t) { ... }. Helper functions and constants next to it are fine.
+- ctx is a CanvasRenderingContext2D already scaled to a fixed 1000x1000 space, (0,0) at the top-left. t runs from 0 to 1 across the 4 second clip.
+- The canvas is cleared to TRANSPARENT before every call. Never paint a background, sky or ground fill: transparent pixels are empty resin. Paint only the things in the scene. A thin ground line is fine if the scene needs it.
+- The result is shrunk to 192x192 pixels, so draw big, chunky, flat shapes: every body part at least 30 units thick, lines at least 18 units wide, no tiny details, no text, no gradients, no shadows, globalAlpha always 1.
+- draw must be a pure function of t: no Math.random (use a fixed formula for variety), no Date, no state kept between calls, no timers, no network, no DOM, no images, no async.
+- The view is fixed: no camera movement, no zoom.
+- Motion: one to three subjects that move smoothly and continuously for the WHOLE clip (no teleporting, no long pauses), travelling across a large part of the frame so their trails are long and clear. Believable physics: arcs for jumps, easing for starts and stops, squash on landing.
+- Static things (trees, rocks, posts) are drawn identically in every frame and become pillars. At most 4 of them, each narrower than 90 units, placed so the moving subjects pass between or in front of them, never hidden behind them.
+- Pick the view that makes the best sculpture: side view for jumping, falling, bouncing and swinging; top-down view for paths, weaving between obstacles, orbits and chases.
+- Colours: bright, saturated, clearly different for each moving subject so each trail reads on its own; calmer colours for static things.
+
+OUTPUT exactly this and nothing else:
+<title>short English title, at most 6 words</title>
+<bg>#rrggbb, the background colour of the scene, light and calm</bg>
+<code>
+function draw(ctx, t) {
+  ...
+}
+</code>`;

@@ -4,3 +4,4 @@ Niepotrzebne/
 .wrangler/
 .DS_Store
 .claude/
+.dev.vars

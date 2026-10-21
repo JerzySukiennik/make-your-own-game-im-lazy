@@ -2,7 +2,7 @@
    The key lives in the Worker secret ANTHROPIC_API_KEY and never reaches the browser.
    Prompts live here, so visitors cannot use this as a free general-purpose proxy. */
 
-import { SYSTEM_CODE, SYSTEM_REPAIR, SYSTEM_REBUILD, SYSTEM_ASK, SYSTEM_EVAL, SYSTEM_SVG, SYSTEM_QA } from "./prompts.mjs";
+import { SYSTEM_CODE, SYSTEM_REPAIR, SYSTEM_REBUILD, SYSTEM_ASK, SYSTEM_EVAL, SYSTEM_SVG, SYSTEM_QA, SYSTEM_SCENE } from "./prompts.mjs";
 import { mock } from "./mock.mjs";
 
 const HAIKU = "claude-haiku-5-5";
@@ -139,7 +139,7 @@ export default {
     }
     if (req.method !== "POST") return json(req, { error: "POST only" }, 405);
     const stage = path.replace("/api/", "");
-    if (!["ask", "eval", "svg", "code", "repair", "qa"].includes(stage)) return json(req, { error: "unknown stage" }, 404);
+    if (!["ask", "eval", "svg", "code", "repair", "qa", "scene"].includes(stage)) return json(req, { error: "unknown stage" }, 404);
     if (!isMock && !env.ANTHROPIC_API_KEY) return json(req, { error: "The AI is not switched on yet (no API key on the server)." }, 503);
 
     const origin = req.headers.get("origin") || "";
@@ -161,6 +161,12 @@ export default {
       const g = await kvGet(env, `ip:${ip}:${d}:games`);
       if (g >= perIpGames) return json(req, { error: `Limit: ${perIpGames} new games per day from one connection. Rebuilding by fixing bugs is free.`, code: "games" }, 429);
       await kvPut(env, `ip:${ip}:${d}:games`, g + 1);
+    }
+    if (stage === "scene" && !isMock && !unlocked) {
+      const perIpScenes = parseInt(env.SCENES_PER_IP || "20", 10);
+      const s = await kvGet(env, `ip:${ip}:${d}:scenes`);
+      if (s >= perIpScenes) return json(req, { error: `Limit: ${perIpScenes} AI scenes per day from one connection.`, code: "scenes" }, 429);
+      await kvPut(env, `ip:${ip}:${d}:scenes`, s + 1);
     }
     await kvPut(env, `ip:${ip}:${d}:calls`, calls + 1);
 
@@ -194,6 +200,22 @@ export default {
           : "Build the game now." }];
         out = await codeCall(env, HAIKU, rebuild ? SYSTEM_REBUILD : SYSTEM_CODE, ask, "low");
         usd = out.usd; delete out.usd;
+      } else if (stage === "scene") {
+        const prompt = String(p.prompt || "").slice(0, 300).trim();
+        if (!prompt) throw new Error("Describe a scene first.");
+        const content = [{ type: "text", text: `SCENE: ${prompt}` }];
+        if (p.fix && p.fix.code) content.push({ type: "text", text: `Your previous program did not work: ${String(p.fix.error || "unknown problem").slice(0, 400)}\n<code>\n${String(p.fix.code).slice(0, 15000)}\n</code>\nReturn the corrected complete program in the same output format.` });
+        let r = await claude(env, HAIKU, SYSTEM_SCENE, content, 8000, "low");
+        usd = r.usd;
+        let parsed;
+        try { parsed = parseCode(r.text); } catch (e) {
+          r = await claude(env, HAIKU, SYSTEM_SCENE, content.concat([{ type: "text", text: "Think only briefly and output the <title>, <bg> and <code> sections right away." }]), 8000, "low");
+          usd += r.usd;
+          parsed = parseCode(r.text);
+        }
+        const title = ((r.text.match(/<title>([\s\S]*?)<\/title>/i) || [])[1] || "").trim().slice(0, 60);
+        const bg = (r.text.match(/<bg>\s*(#[0-9a-fA-F]{6})/i) || [])[1] || "#ece7dc";
+        out = { code: parsed.code.slice(0, 40000), title, bg };
       } else if (stage === "repair") {
         model = p.escalate ? SONNET : HAIKU;
         const rep = p.report || {};
@@ -214,7 +236,7 @@ export default {
       return { status: e.status === 529 ? 503 : 502, body: { error: String(e.message || e).slice(0, 300) } };
     } };
 
-    if (stage !== "code" && stage !== "repair") { const r = await work(); return json(req, r.body, r.status); }
+    if (stage !== "code" && stage !== "repair" && stage !== "scene") { const r = await work(); return json(req, r.body, r.status); }
     /* long stages: answer immediately and send whitespace heartbeats so no proxy cuts the connection */
     const enc = new TextEncoder();
     const stream = new ReadableStream({
